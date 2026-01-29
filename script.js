@@ -851,6 +851,7 @@ function startMatchmaking() {
         name: state.p1.name,
         emoji: state.p1.emoji, // Send my emoji to the lobby
         size: state.size,
+        trophies: state.p1.trophies || 0, // Include trophies for skill-based matching
         timestamp: Date.now()
     });
 
@@ -864,26 +865,43 @@ function startMatchmaking() {
 
     db.ref('matchmaking').on('value', snap => {
         const q = snap.val();
+        if (!q) return;
+        
+        // Filter candidates: same board size, not self
+        const candidates = [];
         for (let id in q) {
             if (q[id].uid !== state.p1.uid && q[id].size === state.size) {
-                const gid = [state.p1.uid, q[id].uid].sort().join('_');
-
-                // Cleanup
-                db.ref(`matchmaking/${id}`).remove();
-                qRef.remove();
-                db.ref('matchmaking').off();
-                if (state.matchmakingTimeout) {
-                    clearTimeout(state.matchmakingTimeout);
-                    state.matchmakingTimeout = null;
-                }
-                state.matchmakingRef = null;
-
-                // ROLE ARBITRATION: Lower UID is Creator (X)
-                const isCreator = state.p1.uid < q[id].uid;
-                initOnlineGame(gid, q[id], isCreator);
-                return;
+                candidates.push({ id, ...q[id] });
             }
         }
+        
+        if (candidates.length === 0) return;
+        
+        // Sort by trophy difference (closest skill level first)
+        const myTrophies = state.p1.trophies || 0;
+        candidates.sort((a, b) => {
+            const diffA = Math.abs((a.trophies || 0) - myTrophies);
+            const diffB = Math.abs((b.trophies || 0) - myTrophies);
+            return diffA - diffB;
+        });
+        
+        // Pick the best match (closest in skill)
+        const bestMatch = candidates[0];
+        const gid = [state.p1.uid, bestMatch.uid].sort().join('_');
+
+        // Cleanup
+        db.ref(`matchmaking/${bestMatch.id}`).remove();
+        qRef.remove();
+        db.ref('matchmaking').off();
+        if (state.matchmakingTimeout) {
+            clearTimeout(state.matchmakingTimeout);
+            state.matchmakingTimeout = null;
+        }
+        state.matchmakingRef = null;
+
+        // ROLE ARBITRATION: Lower UID is Creator (X)
+        const isCreator = state.p1.uid < bestMatch.uid;
+        initOnlineGame(gid, bestMatch, isCreator);
     });
 }
 function initOnlineGame(gid, opp, isCreator) {
