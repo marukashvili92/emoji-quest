@@ -86,7 +86,7 @@
         <div class="button-group safe-bottom">
             <button class="btn-primary" id="playGameBtn" onclick="Sound.play('click'); showScreen('game-setup')">PLAY GAME</button>
             <button class="btn-secondary" onclick="Sound.play('click'); openLeaderboardScreen()">🏆 LEADERBOARD</button>
-            <button id="muteBtn" class="btn-secondary" onclick="Sound.play('click'); toggleMute()">🔊 SOUND ON</button>
+            <button class="btn-secondary" onclick="Sound.play('click'); openSettingsModal()">⚙️ SETTINGS</button>
             <button class="btn-secondary" onclick="Sound.play('click'); showScreen('other-games-screen')">OTHER GAMES</button>
             <button class="btn-secondary" onclick="Sound.play('click'); showScreen('about-screen')">ABOUT</button>
         </div>
@@ -393,6 +393,39 @@
         <button class="btn-secondary" onclick="Sound.play('click'); document.getElementById('challengeModeModal').classList.remove('active')">Cancel</button>
     </div>
 </div>
+<!-- Settings Modal -->
+<div class="modal" id="settingsModal">
+    <div class="glass-modal">
+        <h2>⚙️ Settings</h2>
+
+        <!-- Sound Toggle -->
+        <div style="display:flex; justify-content:space-between; align-items:center; padding:15px 0; border-bottom:1px solid rgba(255,255,255,0.1);">
+            <span style="font-size:16px;">🔊 Sound</span>
+            <label class="switch">
+                <input type="checkbox" id="soundToggle" checked onchange="toggleSound()">
+                <span class="slider"></span>
+            </label>
+        </div>
+
+        <!-- Vibration Toggle -->
+        <div style="display:flex; justify-content:space-between; align-items:center; padding:15px 0; border-bottom:1px solid rgba(255,255,255,0.1);">
+            <span style="font-size:16px;">📳 Vibration</span>
+            <label class="switch">
+                <input type="checkbox" id="vibrationToggle" checked onchange="toggleVibration()">
+                <span class="slider"></span>
+            </label>
+        </div>
+
+        <!-- Privacy & Legal Links -->
+        <div style="margin-top:20px;">
+            <button class="btn-secondary" style="width:100%; margin-bottom:10px;" onclick="Sound.play('click'); openPrivacyPolicy()">📜 Privacy Policy</button>
+            <button class="btn-secondary" style="width:100%; margin-bottom:10px; background:rgba(255,118,117,0.2); border-color:rgba(255,118,117,0.3);" onclick="Sound.play('click'); openDataDeletion()">🗑️ Delete My Data</button>
+        </div>
+
+        <button class="btn-primary" style="margin-top:15px;" onclick="Sound.play('click'); closeSettingsModal()">DONE</button>
+    </div>
+</div>
+
 <!-- Avatar Picker Modal -->
 <div class="modal" id="avatarPickerModal">
     <div class="glass-modal">
