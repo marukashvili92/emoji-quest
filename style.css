@@ -370,12 +370,26 @@ body {
     background: rgba(255, 255, 255, 0.08); border-radius: 12px;
     display: flex; align-items: center; justify-content: center;
     font-size: calc(180px / var(--grid-size, 3)); cursor: pointer;
-    border: 1px solid rgba(255,255,255,0.05); transition: background 0.1s, border-color 0.1s;
+    border: 1px solid rgba(255,255,255,0.05); transition: background 0.3s, border-color 0.3s, transform 0.3s, box-shadow 0.3s;
     aspect-ratio: 1/1;
     overflow: hidden;
 }
 .cell:active { background: rgba(255, 255, 255, 0.15); }
 .cell.blocked { background: rgba(231, 76, 60, 0.3); color: #fff; cursor: not-allowed; border-color: #ff7675; }
+
+/* Winning Line Highlight */
+.cell.winning-cell {
+    background: rgba(85, 239, 196, 0.4) !important;
+    border-color: #55efc4 !important;
+    box-shadow: 0 0 20px rgba(85, 239, 196, 0.6);
+    transform: scale(1.05);
+    animation: winPulse 0.5s ease-in-out infinite alternate;
+}
+
+@keyframes winPulse {
+    from { box-shadow: 0 0 15px rgba(85, 239, 196, 0.4); }
+    to { box-shadow: 0 0 25px rgba(85, 239, 196, 0.8); }
+}
 
 .timer-pill { transition: 0.3s; padding: 8px 20px; border-radius: 20px; background: rgba(0,0,0,0.3); font-weight: 900; border: 1px solid rgba(255,255,255,0.1); }
 .timer-grace { background: rgba(46, 213, 115, 0.4); border-color: #2ed573; }
@@ -388,11 +402,11 @@ body {
 .selector button { flex: 1; padding: 12px 5px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.05); color: white; font-weight: 700; transition: 0.2s; font-size: 12px; }
 .selector button.active { border: 2px solid #6c5ce7; background: rgba(108, 92, 231, 0.25); box-shadow: 0 0 15px rgba(108, 92, 231, 0.4); transform: scale(1.05); }
 
-.stat-box { 
-    border: 2px solid transparent; 
-    border-radius: 20px; 
-    padding: 10px; 
-    transition: 0.3s; 
+.stat-box {
+    border: 2px solid transparent;
+    border-radius: 20px;
+    padding: 10px;
+    transition: 0.3s;
     position: relative;
     min-width: 80px;
     min-height: 100px;
