@@ -278,7 +278,7 @@
     <!-- 4. ACTIVE GAME SCREEN -->
     <div class="screen" id="screen-game-area">
         <div id="gameChallengeSection" style="margin-bottom: 10px; text-align: center; min-height: 40px;">
-            <button id="activateChallengeBtn" class="btn-challenge" onclick="Sound.play('click'); activateInGameChallenge()">🔥 Challenge Mode (Win x2)</button>
+            <button id="gameQuitBtn" class="btn-secondary" onclick="Sound.play('click'); handleBackButton()">QUIT</button>
             <p id="challengeActiveLabel" class="challenge-active-text" style="display:none; color: #ff7675; font-weight: bold;">⚠️ CHALLENGE ACTIVE</p>
         </div>
 
@@ -327,8 +327,8 @@
         </div>
 
         <div class="button-group safe-bottom" style="margin-top: 15px;">
+            <button id="activateChallengeBtn" class="btn-challenge" onclick="Sound.play('click'); activateInGameChallenge()">🔥 Challenge Mode (Win x2)</button>
             <button id="gameResetBtn" class="btn-secondary" onclick="Sound.play('click'); resetCurrentGame()">RESET</button>
-            <button class="btn-secondary" onclick="Sound.play('click'); showScreen('menu')">QUIT</button>
         </div>
     </div>
 
@@ -397,7 +397,7 @@
 <div class="modal" id="settingsModal">
     <div class="glass-modal">
         <h2>⚙️ Settings</h2>
-
+        
         <!-- Sound Toggle -->
         <div style="display:flex; justify-content:space-between; align-items:center; padding:15px 0; border-bottom:1px solid rgba(255,255,255,0.1);">
             <span style="font-size:16px;">🔊 Sound</span>
@@ -406,7 +406,7 @@
                 <span class="slider"></span>
             </label>
         </div>
-
+        
         <!-- Vibration Toggle -->
         <div style="display:flex; justify-content:space-between; align-items:center; padding:15px 0; border-bottom:1px solid rgba(255,255,255,0.1);">
             <span style="font-size:16px;">📳 Vibration</span>
@@ -415,13 +415,13 @@
                 <span class="slider"></span>
             </label>
         </div>
-
+        
         <!-- Privacy & Legal Links -->
         <div style="margin-top:20px;">
             <button class="btn-secondary" style="width:100%; margin-bottom:10px;" onclick="Sound.play('click'); openPrivacyPolicy()">📜 Privacy Policy</button>
             <button class="btn-secondary" style="width:100%; margin-bottom:10px; background:rgba(255,118,117,0.2); border-color:rgba(255,118,117,0.3);" onclick="Sound.play('click'); openDataDeletion()">🗑️ Delete My Data</button>
         </div>
-
+        
         <button class="btn-primary" style="margin-top:15px;" onclick="Sound.play('click'); closeSettingsModal()">DONE</button>
     </div>
 </div>
