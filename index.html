@@ -1,0 +1,467 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Tic Tac Toe Emoji Quest</title>
+    <!-- CSS for Design -->
+    <link rel="stylesheet" href="style.css">
+    <!-- Firebase SDKs for Cloud Data -->
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database-compat.js"></script>
+    <!-- Phosphor Icons for High-Quality Logos -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+</head>
+<body>
+
+<!-- Animated Background Effect -->
+<div class="background-anim"></div>
+
+<div class="container glass-panel">
+    <!-- Floating Emojis Container -->
+    <div id="emojiContainer"></div>
+
+    <!-- Rank Up Alert -->
+    <div class="overlay" id="rankUpOverlay" style="display: none;">
+        <div class="glass-modal">
+            <h1 id="rankUpText" class="gradient-text">RANK UP!</h1>
+            <p id="rankUpSubtext">You are now a Pro</p>
+            <button class="btn-primary" onclick="Sound.play('click'); closeRankUp()">Awesome!</button>
+        </div>
+    </div>
+
+    <!-- Matchmaking Loader (For Online Mode) -->
+    <div id="loadingOverlay" class="overlay" style="display: none;">
+        <div class="loader"></div>
+        <p id="loadingText">Finding Opponent...</p>
+        <button onclick="Sound.play('click'); cancelMatchmaking()" class="btn-secondary">Cancel</button>
+    </div>
+
+    <!-- 1. MAIN MENU SCREEN -->
+    <div class="screen active" id="screen-menu">
+        <div class="glass-card user-profile-bar" onclick="showScreen('my-account')">
+            <div class="profile-info">
+                <img id="myAvatar" src="https://api.dicebear.com/7.x/avataaars/svg?seed=Guest" class="avatar-img">
+                <div>
+                    <p id="myName" style="font-weight: bold;">Guest User</p>
+                    <p id="myRank" style="font-size: 12px; opacity: 0.8;">🥉 Rookie</p>
+                </div>
+            </div>
+            <div class="stats-icons">
+                <div class="stat-pill">💰 <span id="myGold">0</span></div>
+                <div class="stat-pill">🏆 <span id="myTrophies">0</span></div>
+            </div>
+        </div>
+        <button class="btn-gold" onclick="Sound.play('click'); showQuests()">📜 DAILY QUESTS</button>
+
+        <div class="glass-card friends-section">
+            <div class="friends-header">
+                <h3>Social</h3>
+                <div class="header-actions">
+                    <button class="btn-icon" onclick="Sound.play('click'); showScreen('dm-chat')">
+                        <i class="ph-bold ph-envelope-simple"></i>
+                        <div id="globalUnreadDot" class="unread-dot" style="display:none;"></div>
+                    </button>
+                    <button class="btn-icon" onclick="Sound.play('click'); inviteNewFriend()">
+                        <i class="ph-bold ph-user-plus"></i>
+                    </button>
+                </div>
+            </div>
+
+            <div class="friends-scroll-wrapper" id="friendsListWrapper">
+
+                <div id="loggedOutSocial" class="social-prompt">
+                    <div class="social-btns-row">
+                        <button onclick="Sound.play('click'); loginWith('google')" class="social-icon google"><i class="ph-fill ph-google-logo"></i></button>
+                        <button onclick="Sound.play('click'); loginWith('facebook')" class="social-icon fb"><i class="ph-fill ph-facebook-logo"></i></button>
+                    </div>
+                </div>
+
+                <div id="loggedInSocial" class="friends-row" style="display:none;">
+                </div>
+            </div>
+        </div>
+        <!-- Menu Navigation Buttons -->
+        <div class="button-group safe-bottom">
+            <button class="btn-primary" id="playGameBtn" onclick="Sound.play('click'); showScreen('game-setup')">PLAY GAME</button>
+            <button class="btn-secondary" onclick="Sound.play('click'); openLeaderboardScreen()">🏆 LEADERBOARD</button>
+            <button id="muteBtn" class="btn-secondary" onclick="Sound.play('click'); toggleMute()">🔊 SOUND ON</button>
+            <button class="btn-secondary" onclick="Sound.play('click'); showScreen('other-games-screen')">OTHER GAMES</button>
+            <button class="btn-secondary" onclick="Sound.play('click'); showScreen('about-screen')">ABOUT</button>
+        </div>
+    </div>
+
+
+
+
+
+
+    <!-- Online Challenge Modal -->
+    <div class="modal" id="onlineChallengeModal" style="display:none;">
+        <div class="glass-modal">
+            <h2>Online Challenge</h2>
+            <div id="onlineChallengeInfo"></div>
+            <button class="btn-primary" onclick="Sound.play('click'); acceptOnlineChallenge(window._challengeFromUid); document.getElementById('onlineChallengeModal').style.display='none';">Accept</button>
+            <button class="btn-secondary" onclick="Sound.play('click'); document.getElementById('onlineChallengeModal').style.display='none';">Decline</button>
+        </div>
+    </div>
+    <!-- Spectator Modal -->
+    <div class="modal" id="spectatorModal" style="display:none;">
+        <div class="glass-modal">
+            <h2>Spectate Online Game</h2>
+            <input type="text" id="spectatorGameIdInput" placeholder="Enter Game ID (UID_UID)" style="width:100%; margin-bottom:10px;">
+            <button class="btn-primary" onclick="Sound.play('click'); startSpectatingGame(document.getElementById('spectatorGameIdInput').value); document.getElementById('spectatorModal').style.display='none';">Watch</button>
+            <button class="btn-secondary" onclick="Sound.play('click'); document.getElementById('spectatorModal').style.display='none';">Cancel</button>
+        </div>
+    </div>
+
+
+
+
+
+
+
+
+
+
+
+    <!-- 2. MY ACCOUNT / PROFILE SCREEN -->
+    <div class="screen" id="screen-my-account">
+        <h2>My Account</h2>
+
+        <div class="profile-header">
+            <img id="accAvatar" src="" class="avatar-large">
+            <h3 id="accName">Guest</h3>
+            <p id="accRank" class="rank-text">Rookie</p>
+        </div>
+
+        <div id="accWinRate" style="font-size: 11px; font-weight: 900; letter-spacing: 2px; margin-bottom: 12px; text-align: center; color: #55efc4;">
+            0% LETHALITY
+        </div>
+
+        <div class="glass-card stats-grid">
+            <div class="stat-item"><span class="label">Wins</span><span id="accWins" class="val">0</span></div>
+            <div class="stat-item draw-highlight"><span class="label">Draws</span><span id="accDraws" class="val">0</span></div>
+            <div class="stat-item"><span class="label">Losses</span><span id="accLosses" class="val">0</span></div>
+        </div>
+
+        <div class="glass-card stats-grid" style="margin-top: -5px;">
+            <div class="stat-item"><span class="label">Trophies</span><span id="accTrophies" class="val">0</span></div>
+            <div class="stat-item"><span class="label">Gold</span><span id="accGold" class="val">0</span></div>
+            <div class="stat-item"><span class="label">Streak</span><span id="accStreak" class="val">0</span></div>
+        </div>
+
+        <h3 class="section-label">Last 50 Games</h3>
+        <div class="glass-card history-list-wrapper">
+            <div id="myHistoryList"></div>
+        </div>
+
+        <div class="button-group safe-bottom">
+            <button class="btn-primary" onclick="Sound.play('click'); inviteNewFriend()">
+                Invite Friends
+            </button>
+
+            <button id="logout-btn" class="btn-secondary logout-button" style="display: none;" onclick="Sound.play('click'); logout()">
+                LOGOUT
+            </button>
+
+            <button class="btn-secondary" onclick="Sound.play('click'); showScreen('menu')">
+                BACK
+            </button>
+        </div>
+    </div>
+
+    <!-- Friend / Other Player Profile Screen -->
+    <div class="screen" id="screen-friend-profile">
+        <h2 id="fpTitle">Player Profile</h2>
+
+        <div class="profile-header" style="display: flex; align-items: flex-start; gap: 15px; padding: 10px; background: rgba(255,255,255,0.03); border-radius: 15px; margin-bottom: 10px;">
+            <div style="position: relative; display: inline-block;">
+                <img id="fpAvatar" src="" class="avatar-large" style="width: 70px; height: 70px;">
+            </div>
+            <div style="flex: 1; text-align: left;">
+                <h3 id="fpName" style="margin: 0 0 5px 0;">Name</h3>
+                <p id="fpRank" class="rank-text" style="margin: 0 0 5px 0;">Rank</p>
+                <div class="streak-badge" id="fpStreakBadge" style="display: inline-block;">🔥 0 Streak</div>
+                <div id="h2hStatsLabel" style="margin-top:5px; font-weight:bold; color:#ffd700; background: rgba(255, 215, 0, 0.1); padding: 3px 10px; border-radius: 12px; display: inline-block; font-size: 11px;">
+                    VS ME: 0W - 0D - 0L
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px; margin-top: 8px;">
+                    <span style="font-size: 11px; opacity: 0.8;">🔔 Notif</span>
+                    <label class="switch" style="transform: scale(0.8);">
+                        <input type="checkbox" id="fpNotifToggle" onchange="togglePlayerNotif()">
+                        <span class="slider"></span>
+                    </label>
+                    <span id="fpAddRemoveBtn"></span>
+                </div>
+            </div>
+        </div>
+
+        <div class="profile-actions" id="fpActions" style="margin-bottom: 10px; display: flex; gap: 10px; flex-wrap: wrap;">
+        </div>
+
+        <div class="glass-card">
+            <div id="fpWinRate" style="font-size: 11px; font-weight: 900; letter-spacing: 2px; margin-bottom: 12px; text-align: center; color: #55efc4;">
+                0% LETHALITY
+            </div>
+
+            <div class="stats-grid">
+                <div class="stat-item"><span class="label">Wins</span><span id="fpWins" class="val">0</span></div>
+                <div class="stat-item draw-highlight"><span class="label">Draws</span><span id="fpDraws" class="val">0</span></div>
+                <div class="stat-item"><span class="label">Losses</span><span id="fpLosses" class="val">0</span></div>
+            </div>
+
+            <div class="stats-grid" style="margin-top: 10px; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 10px;">
+                <div class="stat-item" style="background: none; border: none;"><span class="label">Trophies</span><span id="fpTrophies" class="val" style="color: #ffd700;">0</span></div>
+                <div class="stat-item" style="background: none; border: none;"><span class="label">Status</span><span id="fpStatus" class="val" style="font-size: 14px; color: #55efc4;">Online</span></div>
+            </div>
+        </div>
+
+        <h3 class="section-label">Last 20 Games Form</h3>
+        <div class="history-list-wrapper">
+            <div id="friendHistoryList"></div>
+        </div>
+
+        <div class="button-group safe-bottom" style="margin-top: 10px;">
+            <button class="btn-secondary" onclick="Sound.play('click'); showScreen('menu')">BACK</button>
+        </div>
+    </div>
+
+    <!-- CHAT SCREEN -->
+    <div class="screen" id="screen-dm-chat">
+        <div class="chat-header" style="text-align: center; padding: 10px;">
+            <h3 id="dmName">Chat</h3>
+        </div>
+        <div class="glass-card dm-area" id="dmArea" style="flex: 1; overflow-y: auto; margin-bottom: 10px;"></div>
+        <div class="chat-input-row" style="display: flex; gap: 8px; margin-bottom: 10px;">
+            <button class="btn-emoji-toggle" onclick="openChatEmojiPicker()">😊</button>
+            <input type="text" id="dmInput" placeholder="Message..." style="flex: 1; background: rgba(255,255,255,0.1); border: none; border-radius: 10px; padding: 10px; color: white;">
+            <button class="btn-xs" onclick="Sound.play('click'); sendDM()">Send</button>
+        </div>
+        <button class="btn-secondary safe-bottom" onclick="Sound.play('click'); showScreen('menu')">BACK</button>
+    </div>
+
+    <!-- 3. GAME SETUP SCREEN -->
+    <div class="screen" id="screen-game-setup">
+        <h2>Setup Match</h2>
+        <div class="glass-card">
+            <label>Tap Avatar or Emoji to change</label>
+            <div class="input-row" style="display: flex; gap: 15px; align-items: center; margin-top: 10px; margin-bottom: 15px;">
+                <img id="p1SetupAvatarImg" src="https://api.dicebear.com/7.x/avataaars/svg?seed=Guest" style="width: 60px; height: 60px; border-radius: 50%; border: 3px solid #6c5ce7; cursor:pointer;" onclick="openAvatarPicker()">
+                <div id="p1SetupEmoji" style="font-size: 35px; cursor:pointer;" onclick="openEmojiPicker()">😊</div>
+                <input type="text" id="p1NameInput" placeholder="Enter Name" maxlength="12" style="flex: 1; background: rgba(255,255,255,0.1); border: none; border-radius: 10px; padding: 12px; color: white;">
+            </div>
+        </div>
+
+        <label class="section-label">Board Size</label>
+        <div class="selector" id="sizeSelector" style="display: flex; gap: 10px; margin-bottom: 15px;">
+            <button class="level-btn active" id="btnSize3" onclick="Sound.play('click'); setBoardSize(3)">3×3</button>
+            <button class="level-btn" id="btnSize5" onclick="Sound.play('click'); setBoardSize(5)">5×5</button>
+            <button class="level-btn" id="btnSize7" onclick="Sound.play('click'); setBoardSize(7)">7×7</button>
+        </div>
+        <label class="section-label">Opponent</label>
+        <div class="selector" id="modeSelector" style="display: flex; gap: 10px;">
+            <button class="mode-btn active" id="btnModeBot" onclick="Sound.play('click'); setMode('bot')">🤖 Bot</button>
+            <button class="mode-btn" id="btnModeLocal" onclick="Sound.play('click'); setMode('local')">👥 Local</button>
+            <button class="mode-btn" id="btnModeOnline" onclick="Sound.play('click'); setMode('online')">🌐 Online</button>
+        </div>
+        <div id="online-ui" style="display: none; margin-top: 10px;">
+            <button class="btn-primary" onclick="Sound.play('click'); handleStartGame()" style="width:100%;">FIND MATCH</button>
+        </div>
+        <div class="button-group safe-bottom" style="margin-top: 20px;">
+            <button id="startBtnNormal" class="btn-primary" onclick="Sound.play('click'); handleStartGame()">START GAME</button>
+            <button class="btn-secondary" onclick="Sound.play('click'); showScreen('menu')">BACK</button>
+        </div>
+    </div>
+
+    <!-- 4. ACTIVE GAME SCREEN -->
+    <div class="screen" id="screen-game-area">
+        <div id="gameChallengeSection" style="margin-bottom: 10px; text-align: center; min-height: 40px;">
+            <button id="activateChallengeBtn" class="btn-challenge" onclick="Sound.play('click'); activateInGameChallenge()">🔥 Challenge Mode (Win x2)</button>
+            <p id="challengeActiveLabel" class="challenge-active-text" style="display:none; color: #ff7675; font-weight: bold;">⚠️ CHALLENGE ACTIVE</p>
+        </div>
+
+        <div class="timer-container" style="text-align: center; margin-bottom: 10px;">
+            <div class="timer-pill" id="timerDisplay">⏳ 20s</div>
+        </div>
+
+        <div class="player-stats-row">
+            <div class="stat-box" id="p1Box" style="position: relative;">
+                <div id="p1SpeechBubble" class="speech-bubble left" style="display:none;"></div>
+                <img id="p1Avatar" src="" class="avatar-small" style="width: 40px; height: 40px; border-radius: 50%;">
+                <span id="p1Emoji" class="player-emoji" style="font-size: 20px;">😊</span>
+                <p id="p1NameDisplay" style="font-size: 12px; font-weight: bold;">You</p>
+                <div class="streak-badge" id="p1StreakBadge">🔥 0</div>
+            </div>
+            <div class="vs-text" style="font-weight: 800; font-size: 20px; opacity: 0.5;">VS</div>
+            <div class="stat-box" id="p2Box" style="position: relative;">
+                <div id="p2SpeechBubble" class="speech-bubble right" style="display:none;"></div>
+                <img id="p2Avatar" src="" class="avatar-small" style="width: 40px; height: 40px; border-radius: 50%;">
+                <span id="p2Emoji" class="player-emoji" style="font-size: 20px;">🤖</span>
+                <p id="p2NameDisplay" style="font-size: 12px; font-weight: bold;">Bot</p>
+                <div class="streak-badge" id="p2StreakBadge">🔥 0</div>
+            </div>
+        </div>
+
+        <div class="game-board-wrapper">
+            <div class="game-board" id="gameBoard"></div>
+
+            <div id="reactionDisplay" style="display:none; position:absolute; left:50%; top:50%; transform:translate(-50%, -50%); font-size:60px; z-index:100; pointer-events: none;"></div>
+
+            <div id="reactionBar" style="margin:15px 0; text-align:center; background: rgba(255,255,255,0.05); padding: 8px; border-radius: 15px;">
+                <span style="font-size:24px; cursor:pointer; margin:0 8px;" onclick="sendReaction('👍')">👍</span>
+                <span style="font-size:24px; cursor:pointer; margin:0 8px;" onclick="sendReaction('😂')">😂</span>
+                <span style="font-size:24px; cursor:pointer; margin:0 8px;" onclick="sendReaction('😮')">😮</span>
+                <span style="font-size:24px; cursor:pointer; margin:0 8px;" onclick="sendReaction('🔥')">🔥</span>
+                <span style="font-size:24px; cursor:pointer; margin:0 8px;" onclick="sendReaction('👏')">👏</span>
+            </div>
+
+            <div id="onlineChatContainer" style="display:none; margin-top:10px;">
+                <div id="onlineChatMessages" style="max-height:60px; overflow-y:auto; background:rgba(255,255,255,0.07); border-radius:10px; padding:8px; margin-bottom:8px; font-size: 11px;"></div>
+                <div style="display:flex; gap:8px;">
+                    <input type="text" id="onlineChatInput" placeholder="Say something..." style="flex:1; background:rgba(255,255,255,0.1); border:none; border-radius:10px; padding:8px; color:white; font-size: 13px;">
+                    <button class="btn-xs" onclick="Sound.play('click'); sendOnlineChatMessage(document.getElementById('onlineChatInput').value); document.getElementById('onlineChatInput').value='';">Send</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="button-group safe-bottom" style="margin-top: 15px;">
+            <button id="gameResetBtn" class="btn-secondary" onclick="Sound.play('click'); resetCurrentGame()">RESET</button>
+            <button class="btn-secondary" onclick="Sound.play('click'); showScreen('menu')">QUIT</button>
+        </div>
+    </div>
+
+    <!-- 5. LEADERBOARD SCREEN -->
+    <div class="screen" id="screen-leaderboard">
+        <h2>Leaderboard</h2>
+        <div class="glass-card full-height-card" style="flex: 1; overflow-y: auto;">
+            <div class="leaderboard-list" id="leaderboardList"></div>
+        </div>
+        <button class="btn-secondary safe-bottom" onclick="Sound.play('click'); showScreen('menu')">BACK</button>
+    </div>
+
+    <!-- 6. OTHER GAMES SCREEN -->
+    <div class="screen" id="screen-other-games-screen">
+        <h2>Other Games</h2>
+        <div class="glass-card" style="flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; gap: 20px;">
+            <div class="rocket-container">
+                <i class="ph-fill ph-rocket-launch" style="font-size: 80px; color: #a29bfe; animation: rocketFloat 3s ease-in-out infinite;"></i>
+            </div>
+            <div style="padding: 0 20px;">
+                <div class="coming-soon-badge">COMING SOON</div>
+                <p style="font-size: 14px; opacity: 0.8; line-height: 1.5; margin-top: 15px;">New exciting titles by Quest Nest Games are currently in development. Prepare for more adventures! </p>
+            </div>
+        </div>
+        <button class="btn-secondary safe-bottom" onclick="Sound.play('click'); showScreen('menu')">BACK</button>
+    </div>
+
+    <!-- 7. ABOUT SCREEN -->
+    <div class="screen" id="screen-about-screen">
+        <h2>About</h2>
+        <div class="glass-card" style="flex: 1; text-align: center; padding: 25px; overflow-y: auto;">
+            <div style="font-size: 50px; margin-bottom: 15px;">🎮</div>
+            <h3 style="color: #a29bfe;">Quest Nest Games</h3>
+            <p style="font-size: 14px; opacity: 0.9; line-height: 1.6; margin-bottom: 20px;">
+                Quest Nest Games is a creative studio dedicated to bringing fun and modern twists to classic games. Our mission is to build engaging experiences that connect people worldwide through simple yet deep gameplay.
+            </p>
+
+            <h3 style="color: #ffd700; margin-top: 10px;">Emoji Quest</h3>
+            <p style="font-size: 14px; opacity: 0.9; line-height: 1.6; margin-bottom: 20px;">
+                Emoji Quest is our modern take on Tic Tac Toe, featuring dynamic grid sizes, a randomized challenge mode, and native social integration. Compete with bots or friends and climb the global leaderboard!
+            </p>
+
+            <div style="margin-top: 25px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 20px;">
+                <button onclick="Sound.play('click'); openWhatsApp('+995591222241')" class="btn-whatsapp">💬 WhatsApp</button>
+                <button onclick="Sound.play('click'); openEmail('marukashvili@gmail.com')" class="btn-email">📧 Email Us</button>
+            </div>
+            <p style="font-size: 11px; opacity: 0.5; margin-top: 20px;">v1.5.5 • © 2026 QuestNest Games</p>
+        </div>
+        <button class="btn-secondary safe-bottom" onclick="Sound.play('click'); showScreen('menu')">BACK</button>
+    </div>
+</div>
+
+<!-- MODALS -->
+<div class="modal" id="challengeModeModal">
+    <div class="glass-modal">
+        <h2>Choose Board Size</h2>
+        <div style="display:flex; gap:10px; justify-content:center; margin:20px 0;">
+            <button class="level-btn" onclick="Sound.play('click'); sendChallengeRequest(3)">3x3</button>
+            <button class="level-btn" onclick="Sound.play('click'); sendChallengeRequest(5)">5x5</button>
+            <button class="level-btn" onclick="Sound.play('click'); sendChallengeRequest(7)">7x7</button>
+        </div>
+        <button class="btn-secondary" onclick="Sound.play('click'); document.getElementById('challengeModeModal').classList.remove('active')">Cancel</button>
+    </div>
+</div>
+<!-- Avatar Picker Modal -->
+<div class="modal" id="avatarPickerModal">
+    <div class="glass-modal">
+        <h2>Choose Avatar</h2>
+        <div id="avatarOptions" style="display:flex; gap:15px; flex-wrap:wrap; justify-content:center; margin:20px 0;">
+            <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Guest" class="avatar-option" onclick="selectAvatar(this.src)">
+            <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Felix" class="avatar-option" onclick="selectAvatar(this.src)">
+            <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Luna" class="avatar-option" onclick="selectAvatar(this.src)">
+            <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Oscar" class="avatar-option" onclick="selectAvatar(this.src)">
+            <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Zoe" class="avatar-option" onclick="selectAvatar(this.src)">
+        </div>
+        <button class="btn-primary" onclick="closeModal()">DONE</button>
+    </div>
+</div>
+<!-- Emoji Picker Modal -->
+<div class="modal" id="emojiPickerModal">
+    <div class="glass-modal">
+        <h2>Choose Emoji</h2>
+        <div style="display:flex; gap:15px; flex-wrap:wrap; justify-content:center; margin:20px 0;">
+            <span class="emoji-option" onclick="selectEmoji('😊')">😊</span>
+            <span class="emoji-option" onclick="selectEmoji('😎')">😎</span>
+            <span class="emoji-option" onclick="selectEmoji('🤪')">🤪</span>
+            <span class="emoji-option" onclick="selectEmoji('👽')">👽</span>
+            <span class="emoji-option" onclick="selectEmoji('👻')">👻</span>
+            <span class="emoji-option" onclick="selectEmoji('🔥')">🔥</span>
+            <span class="emoji-option" onclick="selectEmoji('🦄')">🦄</span>
+            <span class="emoji-option" onclick="selectEmoji('🤡')">🤡</span>
+        </div>
+        <button class="btn-primary" onclick="closeModal()">DONE</button>
+    </div>
+</div>
+<div class="modal" id="chatEmojiModal">
+    <div class="glass-modal">
+        <h2>Select Emoji</h2>
+        <div id="chatEmojiPicker" class="chat-emoji-picker" style="display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; margin: 20px 0;"></div>
+        <button class="btn-primary" onclick="closeModal()">DONE</button>
+    </div>
+</div>
+<div class="modal" id="questsModal">
+    <div class="glass-modal">
+        <h2>Daily Quests</h2>
+        <div id="questsList" class="scrollable-list"></div>
+
+        <!-- Login Prompt for Guests -->
+        <div id="questsLoginPrompt" style="display: none; text-align: center; padding: 20px;">
+            <p style="margin-bottom: 15px;">Log in for better fun!</p>
+            <div style="display: flex; gap: 15px; justify-content: center;">
+                <button onclick="closeModal(); loginWith('google')" class="social-icon google"><i class="ph-fill ph-google-logo"></i></button>
+                <button onclick="closeModal(); loginWith('facebook')" class="social-icon fb"><i class="ph-fill ph-facebook-logo"></i></button>
+            </div>
+        </div>
+        <button class="btn-primary" onclick="Sound.play('click'); closeQuests()" style="margin-top: 15px;">Close</button>
+    </div>
+</div>
+<!-- Game Over Results Popup -->
+<div class="modal" id="gameOverModal">
+    <div class="glass-modal">
+        <h1 id="resultTitle" class="gradient-text">Victory!</h1>
+        <p id="resultMessage"></p>
+        <div class="button-group" style="margin-top:20px;">
+            <button class="btn-primary" id="rematchBtn" onclick="Sound.play('click'); playAgain()">REMATCH</button>
+            <button class="btn-secondary" id="addFriendBtn" style="display:none; background:#00cec9; color:white;" onclick="Sound.play('click'); addFriendFromGame()">➕ ADD FRIEND</button>
+            <button class="btn-primary" onclick="Sound.play('click'); closeModal(); showScreen('game-setup')">PLAY GAME</button>
+            <button class="btn-secondary" id="nextOpponentBtn" style="display:none;" onclick="Sound.play('click'); closeModal(); document.getElementById('loadingOverlay').style.display='flex'; startMatchmaking()">FIND NEXT MATCH</button>
+            <button class="btn-secondary" onclick="Sound.play('click'); closeModal(); openLeaderboardScreen()">🏆 LEADERBOARD</button>
+            <button class="btn-secondary" onclick="Sound.play('click'); closeModal(); showScreen('menu')">MENU</button>
+        </div>
+    </div>
+</div>
+<script src="script.js"></script>
+</body>
+</html>
