@@ -180,14 +180,14 @@ function handleBackButton() {
         resetModal.classList.remove('active');
         return 'handled';
     }
-
+    
     // 2. Check for any other active modals
     const activeModal = document.querySelector('.modal.active');
     if (activeModal) {
         closeModal();
         return 'handled';
     }
-
+    
     // 3. Check for loading overlay
     const loadingOverlay = document.getElementById('loadingOverlay');
     if (loadingOverlay && loadingOverlay.style.display !== 'none') {
@@ -198,19 +198,19 @@ function handleBackButton() {
         }
         return 'handled';
     }
-
+    
     // 4. Check for rank up overlay
     const rankUpOverlay = document.getElementById('rankUpOverlay');
     if (rankUpOverlay && rankUpOverlay.style.display !== 'none') {
         rankUpOverlay.style.display = 'none';
         return 'handled';
     }
-
+    
     // 5. If in game area with active game, show leave confirmation
     if (state.currentScreen === 'game-area') {
         // Check if game is active (timer running or game not finished)
         const gameActive = state.timerInterval || (!state.board.every(c => c === '') && !document.querySelector('.modal.active'));
-
+        
         if (gameActive && state.mode !== 'local') {
             // Show leave game confirmation modal
             showLeaveGameModal();
@@ -221,13 +221,13 @@ function handleBackButton() {
             return 'handled';
         }
     }
-
+    
     // 6. If in any sub-screen, go back to menu
     if (state.currentScreen !== 'menu') {
         showScreen('menu');
         return 'handled';
     }
-
+    
     // 7. Already at menu - tell Android to handle exit confirmation
     return 'menu';
 }
@@ -250,7 +250,7 @@ function showLeaveGameModal() {
         cleanupAndGoToMenu();
         return;
     }
-
+    
     // Create modal if it doesn't exist
     let modal = document.getElementById('leaveGameModal');
     if (!modal) {
@@ -281,7 +281,7 @@ function showLeaveGameModal() {
 function confirmLeaveGame() {
     const modal = document.getElementById('leaveGameModal');
     if (modal) modal.classList.remove('active');
-
+    
     // Record loss for online/bot games (not in grace period since we checked before showing modal)
     if (state.mode === 'online' || state.mode === 'bot') {
         // Update stats as a loss
@@ -289,13 +289,13 @@ function confirmLeaveGame() {
         state.p1.trophies = Math.max(0, state.p1.trophies - 10);
         saveGlobalData();
         updateHeaderProfile();
-
+        
         // Notify opponent in online mode
         if (state.mode === 'online' && state.matchRef) {
             state.matchRef.child('forfeit').set(state.p1.uid);
         }
     }
-
+    
     cleanupAndGoToMenu();
     Sound.play('click');
 }
@@ -314,7 +314,7 @@ function resetCurrentGame() {
         startNewMatch();
         return;
     }
-
+    
     // Show reset confirmation modal
     let modal = document.getElementById('resetGameModal');
     if (!modal) {
@@ -345,20 +345,20 @@ function resetCurrentGame() {
 function confirmResetGame() {
     const modal = document.getElementById('resetGameModal');
     if (modal) modal.classList.remove('active');
-
+    
     // Record loss for online/bot games
     if (state.mode === 'online' || state.mode === 'bot') {
         state.p1.losses = (state.p1.losses || 0) + 1;
         state.p1.trophies = Math.max(0, state.p1.trophies - 10);
         saveGlobalData();
         updateHeaderProfile();
-
+        
         // Notify opponent in online mode
         if (state.mode === 'online' && state.matchRef) {
             state.matchRef.child('forfeit').set(state.p1.uid);
         }
     }
-
+    
     // Start new match
     startNewMatch();
     Sound.play('click');
@@ -554,6 +554,9 @@ function executeMove(index, symbol) {
         state.gameActive = false; // Stop game immediately to prevent more moves
         clearInterval(state.timerInterval);
         highlightWinningLine(winningLine);
+        // Determine if it's a win or loss for vibration
+        const isWin = (state.mode === 'online') ? symbol === state.mySymbol : symbol === 'X';
+        setTimeout(() => Sound.vibrate(isWin ? 300 : 2500), 50); // 300ms win, 2500ms defeat
         setTimeout(() => endGame(symbol), 2000); // 2 second delay to see the winning line
         if (state.mode === 'online') {
             db.ref(`games/${state.gameId}`).update({
@@ -566,6 +569,7 @@ function executeMove(index, symbol) {
     } else if (state.board.every(cell => cell !== '')) {
         state.gameActive = false; // Stop game immediately
         clearInterval(state.timerInterval);
+        setTimeout(() => Sound.vibrate(750), 50); // 750ms draw vibration
         setTimeout(() => endGame('draw'), 1000); // 1 second delay for draw too
         if (state.mode === 'online') {
             db.ref(`games/${state.gameId}`).update({
@@ -608,7 +612,7 @@ function endGame(winner) {
     // 1. Logic for Stats and Quests
     if (isWin) {
         Sound.play('win');
-        Sound.vibrate(300); // Celebratory vibration on win
+        // Vibration now happens with highlight animation
         state.p1.wins++; state.p1.streak++;
         const mySym = (state.mode === 'online') ? state.mySymbol : 'X';
         const challengeActive = mySym === 'X' ? state.isChallengeActiveX : state.isChallengeActiveO;
@@ -625,12 +629,12 @@ function endGame(winner) {
         if (challengeActive) updateQuestProgress('win_challenge', 1);
     } else if (isDraw) {
         Sound.play('draw');
-        Sound.vibrate(700); // Medium vibration on draw
+        // Vibration now happens immediately when draw is detected
         state.p1.draws++;
         updateQuestProgress('draws', 1);
     } else {
         Sound.play('click');
-        Sound.vibrate(2500); // Long vibration on defeat
+        // Vibration now happens with highlight animation
         state.p1.losses++;
         state.p1.streak = 0;
         state.p1.trophies = Math.max(0, state.p1.trophies - 5);
@@ -1131,15 +1135,20 @@ function listenToGame() {
             state.gameActive = false;
             clearInterval(state.timerInterval);
             highlightWinningLine(winX);
+            const isWin = state.mySymbol === 'X';
+            setTimeout(() => Sound.vibrate(isWin ? 300 : 2500), 50); // 300ms win, 2500ms defeat
             setTimeout(() => endGame('X'), 2000);
         } else if (winO) {
             state.gameActive = false;
             clearInterval(state.timerInterval);
             highlightWinningLine(winO);
+            const isWin = state.mySymbol === 'O';
+            setTimeout(() => Sound.vibrate(isWin ? 300 : 2500), 50); // 300ms win, 2500ms defeat
             setTimeout(() => endGame('O'), 2000);
         } else if (!state.board.includes('')) {
             state.gameActive = false;
             clearInterval(state.timerInterval);
+            setTimeout(() => Sound.vibrate(750), 50); // 750ms draw vibration
             setTimeout(() => endGame('draw'), 1000);
         }
     });
@@ -1383,19 +1392,19 @@ function renderFriends() {
         const providers = state.p1.providers || [];
         const hasGoogle = providers.some(p => p.includes('google'));
         const hasFacebook = providers.some(p => p.includes('facebook'));
-
+        
         // Show Google button if not linked
         const googleBtn = loggedOutDiv.querySelector('.google');
         if (googleBtn) googleBtn.style.display = hasGoogle ? 'none' : 'flex';
-
+        
         // Show Facebook button if not linked
         const fbBtn = loggedOutDiv.querySelector('.fb');
         if (fbBtn) fbBtn.style.display = hasFacebook ? 'none' : 'flex';
-
+        
         // Show the div if at least one provider is not linked
         loggedOutDiv.style.display = (!hasGoogle || !hasFacebook) ? 'flex' : 'none';
     }
-
+    
     if (loggedInDiv) {
         loggedInDiv.style.display = 'flex';
         loggedInDiv.innerHTML = ''; // Clear old list
@@ -1594,10 +1603,7 @@ function renderBoard() {
         if (myBlocks.includes(i) && c === '') { d.innerText = "🔒"; d.classList.add('blocked'); }
         else if (c === 'X') d.innerText = xEmoji;
         else if (c === 'O') d.innerText = oEmoji;
-        d.onclick = () => {
-            if (state.mode === 'online' && state.currentPlayer !== state.mySymbol) return;
-            executeMove(i, state.mode === 'online' ? state.mySymbol : state.currentPlayer);
-        };
+        d.onclick = () => handleCellClick(i);
         b.appendChild(d);
     });
 }
@@ -1950,7 +1956,7 @@ function saveGlobalData() {
 function openWhatsApp(phone) {
     // Clean phone number (remove spaces, dashes, etc.)
     const cleanPhone = phone.replace(/[^0-9+]/g, '').replace('+', '');
-
+    
     // Use Android native to open WhatsApp or redirect to Play Store
     if (window.AndroidInterface && window.AndroidInterface.contactWhatsApp) {
         window.AndroidInterface.contactWhatsApp(cleanPhone);
