@@ -89,6 +89,7 @@ const state = {
     gameActive: false,
     mode: 'bot',
     isMuted: false,
+    vibrationEnabled: true,
     timerInterval: null,
     timeLeft: 20,
     timeLeftX: 20,
@@ -126,7 +127,7 @@ let chatListener = null;
 /* --- 4. CORE SYSTEM FUNCTIONS --- */
 const Sound = {
     play: function(type) { if (!state.isMuted && window.AndroidInterface?.playSound) window.AndroidInterface.playSound(type); },
-    vibrate: function(ms) { if (window.AndroidInterface?.vibrate) window.AndroidInterface.vibrate(ms); }
+    vibrate: function(ms) { if (state.vibrationEnabled !== false && window.AndroidInterface?.vibrate) window.AndroidInterface.vibrate(ms); }
 };
 function loginWith(p) { Sound.play('click'); if (window.AndroidInterface) { if (p === 'google') window.AndroidInterface.loginWithGoogle(); else window.AndroidInterface.loginWithFacebook(); } }
 function onNativeLoginSuccess(user) {
@@ -179,14 +180,14 @@ function handleBackButton() {
         resetModal.classList.remove('active');
         return 'handled';
     }
-    
+
     // 2. Check for any other active modals
     const activeModal = document.querySelector('.modal.active');
     if (activeModal) {
         closeModal();
         return 'handled';
     }
-    
+
     // 3. Check for loading overlay
     const loadingOverlay = document.getElementById('loadingOverlay');
     if (loadingOverlay && loadingOverlay.style.display !== 'none') {
@@ -197,19 +198,19 @@ function handleBackButton() {
         }
         return 'handled';
     }
-    
+
     // 4. Check for rank up overlay
     const rankUpOverlay = document.getElementById('rankUpOverlay');
     if (rankUpOverlay && rankUpOverlay.style.display !== 'none') {
         rankUpOverlay.style.display = 'none';
         return 'handled';
     }
-    
+
     // 5. If in game area with active game, show leave confirmation
     if (state.currentScreen === 'game-area') {
         // Check if game is active (timer running or game not finished)
         const gameActive = state.timerInterval || (!state.board.every(c => c === '') && !document.querySelector('.modal.active'));
-        
+
         if (gameActive && state.mode !== 'local') {
             // Show leave game confirmation modal
             showLeaveGameModal();
@@ -220,21 +221,21 @@ function handleBackButton() {
             return 'handled';
         }
     }
-    
+
     // 6. If in any sub-screen, go back to menu
     if (state.currentScreen !== 'menu') {
         showScreen('menu');
         return 'handled';
     }
-    
+
     // 7. Already at menu - tell Android to handle exit confirmation
     return 'menu';
 }
 
-// Grace period constant (10 seconds)
-const GRACE_PERIOD_MS = 10000;
+// Grace period constant (4 seconds)
+const GRACE_PERIOD_MS = 4000;
 
-// Check if we're in grace period (first 10 seconds, no moves made)
+// Check if we're in grace period (first 4 seconds, no moves made)
 function isInGracePeriod() {
     if (!state.gameStartTime) return false;
     const elapsed = Date.now() - state.gameStartTime;
@@ -244,12 +245,12 @@ function isInGracePeriod() {
 
 // Show leave game confirmation modal
 function showLeaveGameModal() {
-    // Check grace period - if within 10s and no moves, just leave without penalty
+    // Check grace period - if within 4s and no moves, just leave without penalty
     if (isInGracePeriod()) {
         cleanupAndGoToMenu();
         return;
     }
-    
+
     // Create modal if it doesn't exist
     let modal = document.getElementById('leaveGameModal');
     if (!modal) {
@@ -280,7 +281,7 @@ function showLeaveGameModal() {
 function confirmLeaveGame() {
     const modal = document.getElementById('leaveGameModal');
     if (modal) modal.classList.remove('active');
-    
+
     // Record loss for online/bot games (not in grace period since we checked before showing modal)
     if (state.mode === 'online' || state.mode === 'bot') {
         // Update stats as a loss
@@ -288,13 +289,13 @@ function confirmLeaveGame() {
         state.p1.trophies = Math.max(0, state.p1.trophies - 10);
         saveGlobalData();
         updateHeaderProfile();
-        
+
         // Notify opponent in online mode
         if (state.mode === 'online' && state.matchRef) {
             state.matchRef.child('forfeit').set(state.p1.uid);
         }
     }
-    
+
     cleanupAndGoToMenu();
     Sound.play('click');
 }
@@ -308,12 +309,12 @@ function cancelLeaveGame() {
 
 // Reset game button handler - shows confirmation modal
 function resetCurrentGame() {
-    // Check grace period - if within 10s and no moves, just reset without penalty
+    // Check grace period - if within 4s and no moves, just reset without penalty
     if (isInGracePeriod() || state.mode === 'local') {
         startNewMatch();
         return;
     }
-    
+
     // Show reset confirmation modal
     let modal = document.getElementById('resetGameModal');
     if (!modal) {
@@ -344,20 +345,20 @@ function resetCurrentGame() {
 function confirmResetGame() {
     const modal = document.getElementById('resetGameModal');
     if (modal) modal.classList.remove('active');
-    
+
     // Record loss for online/bot games
     if (state.mode === 'online' || state.mode === 'bot') {
         state.p1.losses = (state.p1.losses || 0) + 1;
         state.p1.trophies = Math.max(0, state.p1.trophies - 10);
         saveGlobalData();
         updateHeaderProfile();
-        
+
         // Notify opponent in online mode
         if (state.mode === 'online' && state.matchRef) {
             state.matchRef.child('forfeit').set(state.p1.uid);
         }
     }
-    
+
     // Start new match
     startNewMatch();
     Sound.play('click');
@@ -546,19 +547,26 @@ function executeMove(index, symbol) {
     renderBoard();
     updateTurnUI(); // Update challenge button visibility immediately
     Sound.play('move');
+    Sound.vibrate(30); // Short haptic feedback on move
 
-    if (checkWin(symbol)) {
-        endGame(symbol);
+    const winningLine = checkWin(symbol);
+    if (winningLine) {
+        state.gameActive = false; // Stop game immediately to prevent more moves
+        clearInterval(state.timerInterval);
+        highlightWinningLine(winningLine);
+        setTimeout(() => endGame(symbol), 2000); // 2 second delay to see the winning line
         if (state.mode === 'online') {
             db.ref(`games/${state.gameId}`).update({
                 board: state.board,
-                currentPlayer: (symbol === 'X') ? 'O' : 'X', // Set next turn anyway
+                currentPlayer: (symbol === 'X') ? 'O' : 'X',
                 timeLeftX: state.timeLeftX,
                 timeLeftO: state.timeLeftO
             });
         }
     } else if (state.board.every(cell => cell !== '')) {
-        endGame('draw');
+        state.gameActive = false; // Stop game immediately
+        clearInterval(state.timerInterval);
+        setTimeout(() => endGame('draw'), 1000); // 1 second delay for draw too
         if (state.mode === 'online') {
             db.ref(`games/${state.gameId}`).update({
                 board: state.board
@@ -600,6 +608,7 @@ function endGame(winner) {
     // 1. Logic for Stats and Quests
     if (isWin) {
         Sound.play('win');
+        Sound.vibrate(300); // Celebratory vibration on win
         state.p1.wins++; state.p1.streak++;
         const mySym = (state.mode === 'online') ? state.mySymbol : 'X';
         const challengeActive = mySym === 'X' ? state.isChallengeActiveX : state.isChallengeActiveO;
@@ -616,14 +625,12 @@ function endGame(winner) {
         if (challengeActive) updateQuestProgress('win_challenge', 1);
     } else if (isDraw) {
         Sound.play('draw');
+        Sound.vibrate(700); // Medium vibration on draw
         state.p1.draws++;
         updateQuestProgress('draws', 1);
     } else {
         Sound.play('click');
-        // Vibrate on defeat - call directly to ensure it works
-        if (window.AndroidInterface && window.AndroidInterface.vibrate) {
-            window.AndroidInterface.vibrate(1000);
-        }
+        Sound.vibrate(2500); // Long vibration on defeat
         state.p1.losses++;
         state.p1.streak = 0;
         state.p1.trophies = Math.max(0, state.p1.trophies - 5);
@@ -1117,11 +1124,24 @@ function listenToGame() {
             startTimer();
         }
 
-        // 5. WIN CHECK
-        // We check for wins based on the logic symbol (X or O)
-        if (checkWin('X')) endGame('X');
-        else if (checkWin('O')) endGame('O');
-        else if (!state.board.includes('')) endGame('draw');
+        // 5. WIN CHECK with highlight and delay
+        const winX = checkWin('X');
+        const winO = checkWin('O');
+        if (winX) {
+            state.gameActive = false;
+            clearInterval(state.timerInterval);
+            highlightWinningLine(winX);
+            setTimeout(() => endGame('X'), 2000);
+        } else if (winO) {
+            state.gameActive = false;
+            clearInterval(state.timerInterval);
+            highlightWinningLine(winO);
+            setTimeout(() => endGame('O'), 2000);
+        } else if (!state.board.includes('')) {
+            state.gameActive = false;
+            clearInterval(state.timerInterval);
+            setTimeout(() => endGame('draw'), 1000);
+        }
     });
 }
 function updateGamePlayerInfo() {
@@ -1363,19 +1383,19 @@ function renderFriends() {
         const providers = state.p1.providers || [];
         const hasGoogle = providers.some(p => p.includes('google'));
         const hasFacebook = providers.some(p => p.includes('facebook'));
-        
+
         // Show Google button if not linked
         const googleBtn = loggedOutDiv.querySelector('.google');
         if (googleBtn) googleBtn.style.display = hasGoogle ? 'none' : 'flex';
-        
+
         // Show Facebook button if not linked
         const fbBtn = loggedOutDiv.querySelector('.fb');
         if (fbBtn) fbBtn.style.display = hasFacebook ? 'none' : 'flex';
-        
+
         // Show the div if at least one provider is not linked
         loggedOutDiv.style.display = (!hasGoogle || !hasFacebook) ? 'flex' : 'none';
     }
-    
+
     if (loggedInDiv) {
         loggedInDiv.style.display = 'flex';
         loggedInDiv.innerHTML = ''; // Clear old list
@@ -1524,18 +1544,34 @@ function checkWin(p) {
     const s = state.size, w = state.winCondition, b = state.board;
     const ck = (i, st) => {
         const startCol = i % s;
+        const indices = [];
         for (let k = 0; k < w; k++) {
             let idx = i + k * st;
-            if (idx < 0 || idx >= b.length || b[idx] !== p) return false;
+            if (idx < 0 || idx >= b.length || b[idx] !== p) return null;
             const currentCol = idx % s;
-            if (st === 1 && Math.floor(idx / s) !== Math.floor(i / s)) return false;
-            if (st === s + 1 && currentCol !== startCol + k) return false;
-            if (st === s - 1 && currentCol !== startCol - k) return false;
+            if (st === 1 && Math.floor(idx / s) !== Math.floor(i / s)) return null;
+            if (st === s + 1 && currentCol !== startCol + k) return null;
+            if (st === s - 1 && currentCol !== startCol - k) return null;
+            indices.push(idx);
         }
-        return true;
+        return indices;
     };
-    for (let i = 0; i < b.length; i++) { if (ck(i, 1) || ck(i, s) || ck(i, s + 1) || (i % s >= w - 1 && ck(i, s - 1))) return true; }
-    return false;
+    for (let i = 0; i < b.length; i++) {
+        let result = ck(i, 1) || ck(i, s) || ck(i, s + 1) || (i % s >= w - 1 && ck(i, s - 1));
+        if (result) return result; // Return winning indices array
+    }
+    return null;
+}
+
+// Highlight winning cells
+function highlightWinningLine(indices) {
+    if (!indices || indices.length === 0) return;
+    const cells = document.querySelectorAll('.cell');
+    indices.forEach(idx => {
+        if (cells[idx]) {
+            cells[idx].classList.add('winning-cell');
+        }
+    });
 }
 
 function renderBoard() {
@@ -1823,12 +1859,47 @@ function showAchievementModal(a) {
 }
 
 /* --- 12. UTILS --- */
+
+// Settings Modal Functions
+function openSettingsModal() {
+    const modal = document.getElementById('settingsModal');
+    if (modal) {
+        // Sync toggles with current state
+        const soundToggle = document.getElementById('soundToggle');
+        const vibrationToggle = document.getElementById('vibrationToggle');
+        if (soundToggle) soundToggle.checked = !state.isMuted;
+        if (vibrationToggle) vibrationToggle.checked = state.vibrationEnabled !== false;
+        modal.classList.add('active');
+    }
+}
+
+function closeSettingsModal() {
+    const modal = document.getElementById('settingsModal');
+    if (modal) modal.classList.remove('active');
+}
+
+function toggleSound() {
+    const toggle = document.getElementById('soundToggle');
+    state.isMuted = toggle ? !toggle.checked : !state.isMuted;
+    saveGlobalData();
+}
+
+function toggleVibration() {
+    const toggle = document.getElementById('vibrationToggle');
+    state.vibrationEnabled = toggle ? toggle.checked : !state.vibrationEnabled;
+    // Test vibration when enabled
+    if (state.vibrationEnabled && window.AndroidInterface?.vibrate) {
+        window.AndroidInterface.vibrate(50);
+    }
+    saveGlobalData();
+}
+
+// Legacy function for compatibility
 function toggleMute() {
     state.isMuted = !state.isMuted;
-    const btn = document.getElementById('muteBtn');
-    if (btn) {
-        btn.innerText = state.isMuted ? "🔇 SOUND OFF" : "🔊 SOUND ON";
-    }
+    const soundToggle = document.getElementById('soundToggle');
+    if (soundToggle) soundToggle.checked = !state.isMuted;
+    saveGlobalData();
 }
 function inviteNewFriend() { if(window.AndroidInterface) window.AndroidInterface.shareApp("Join Tic Tac Toe!"); }
 function loadGlobalData() {
@@ -1839,6 +1910,8 @@ function loadGlobalData() {
             if (d.p1) Object.assign(state.p1, d.p1);
             if (d.quests) state.quests = d.quests;
             if (d.messages) state.messages = d.messages;
+            if (d.isMuted !== undefined) state.isMuted = d.isMuted;
+            if (d.vibrationEnabled !== undefined) state.vibrationEnabled = d.vibrationEnabled;
         }
     } catch (e) {
         console.error("Error loading data:", e);
@@ -1869,19 +1942,41 @@ function saveGlobalData() {
     localStorage.setItem('QuestNest_Global_Data', JSON.stringify({
         p1: state.p1,
         quests: state.quests,
-        messages: state.messages
+        messages: state.messages,
+        isMuted: state.isMuted,
+        vibrationEnabled: state.vibrationEnabled
     }));
 }
 function openWhatsApp(phone) {
     // Clean phone number (remove spaces, dashes, etc.)
     const cleanPhone = phone.replace(/[^0-9+]/g, '').replace('+', '');
-    
+
     // Use Android native to open WhatsApp or redirect to Play Store
     if (window.AndroidInterface && window.AndroidInterface.contactWhatsApp) {
         window.AndroidInterface.contactWhatsApp(cleanPhone);
     }
 }
 function openEmail(email) { if(window.AndroidInterface) window.AndroidInterface.contactEmail(email); }
+
+// Privacy & Data Deletion Links
+function openPrivacyPolicy() {
+    const url = "https://marukashvili92.github.io/emoji-quest/privacy.html";
+    if (window.AndroidInterface && window.AndroidInterface.openExternalUrl) {
+        window.AndroidInterface.openExternalUrl(url);
+    } else {
+        window.open(url, "_blank");
+    }
+}
+
+function openDataDeletion() {
+    const url = "https://marukashvili92.github.io/emoji-quest/data-deletion.html";
+    if (window.AndroidInterface && window.AndroidInterface.openExternalUrl) {
+        window.AndroidInterface.openExternalUrl(url);
+    } else {
+        window.open(url, "_blank");
+    }
+}
+
 function openNativeLeaderboard() {if(window.AndroidInterface) window.AndroidInterface.openLeaderboardScreen(); }
 function closeRankUp() {
     const o = document.getElementById('rankUpOverlay');
